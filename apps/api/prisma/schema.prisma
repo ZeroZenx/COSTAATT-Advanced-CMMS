@@ -1,0 +1,522 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  TECHNICIAN
+  REQUESTOR
+}
+
+enum Status {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUST
+}
+
+enum MaintenanceStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  role         Role     @default(REQUESTOR)
+  department   String?
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  createdWorkOrders WorkOrder[] @relation("CreatedBy")
+  assignedWorkOrders WorkOrder[] @relation("AssignedTo")
+  comments          Comment[]
+  
+  // New module relations
+  maintenanceAssignedTo MaintenanceSchedule[] @relation("MaintenanceAssignedTo")
+  maintenanceCompletedBy MaintenanceTask[] @relation("MaintenanceCompletedBy")
+  inventoryPerformedBy InventoryTransaction[] @relation("InventoryPerformedBy")
+  
+  // Notification relations
+  notifications       Notification[]
+  notificationPreferences NotificationPreferences?
+  pushTokens          PushToken[]
+  
+  // Vendor performance relations
+  vendorPerformance   VendorPerformance[]
+
+  @@map("users")
+}
+
+model WorkOrder {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      Status   @default(OPEN)
+  priority    Priority @default(MEDIUM)
+  location    String
+  category    String
+  createdById String
+  assignedToId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  // Relations
+  createdBy   User        @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo  User?       @relation("AssignedTo", fields: [assignedToId], references: [id])
+  comments    Comment[]
+  attachments Attachment[]
+  
+  // New module relations
+  maintenanceTasks MaintenanceTask[]
+  inventoryTransactions InventoryTransaction[]
+  slaEvents       SLAEvent[]
+  
+  // Notification relations
+  notifications     Notification[]
+  
+  // Workflow relations
+  workflowExecutions WorkflowExecution[]
+  
+  // Vendor performance relations
+  vendorPerformance VendorPerformance[]
+
+  @@map("work_orders")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  building    String?
+  floor       String?
+  room        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("locations")
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  content     String
+  workOrderId String
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("comments")
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  workOrderId String
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+// === PREVENTIVE MAINTENANCE MODULE ===
+model MaintenanceSchedule {
+  id              String            @id @default(cuid())
+  title           String
+  description     String?
+  assetId         String
+  frequency       Frequency
+  nextDueDate     DateTime
+  lastCompletedDate DateTime?
+  assignedToId    String?
+  status          MaintenanceStatus @default(ACTIVE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  assignedTo      User?             @relation("MaintenanceAssignedTo", fields: [assignedToId], references: [id])
+  tasks           MaintenanceTask[]
+
+  @@map("maintenance_schedules")
+}
+
+model MaintenanceTask {
+  id              String   @id @default(cuid())
+  scheduleId      String
+  workOrderId     String?
+  performedAt     DateTime?
+  notes           String?
+  completedById   String?
+  createdAt       DateTime @default(now())
+
+  // Relations
+  schedule        MaintenanceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  workOrder       WorkOrder?          @relation(fields: [workOrderId], references: [id])
+  completedBy     User?               @relation("MaintenanceCompletedBy", fields: [completedById], references: [id])
+
+  @@map("maintenance_tasks")
+}
+
+// === INVENTORY MANAGEMENT MODULE ===
+model InventoryItem {
+  id            String   @id @default(cuid())
+  name          String
+  sku           String   @unique
+  category      String
+  quantity      Int      @default(0)
+  reorderLevel  Int      @default(0)
+  unitCost      Decimal  @default(0) @db.Decimal(10, 2)
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  transactions  InventoryTransaction[]
+
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id            String          @id @default(cuid())
+  itemId        String
+  workOrderId   String?
+  type          TransactionType
+  quantity      Int
+  performedById String
+  notes         String?
+  createdAt     DateTime        @default(now())
+
+  // Relations
+  item          InventoryItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  workOrder     WorkOrder?      @relation(fields: [workOrderId], references: [id])
+  performedBy   User            @relation("InventoryPerformedBy", fields: [performedById], references: [id])
+
+  @@map("inventory_transactions")
+}
+
+// === SLA & AUTOMATION MODULE ===
+model SLAEvent {
+  id            String    @id @default(cuid())
+  workOrderId   String
+  targetAt      DateTime
+  breached      Boolean   @default(false)
+  resolvedAt    DateTime?
+  escalated     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  workOrder     WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@map("sla_events")
+}
+
+// === NOTIFICATION SYSTEM MODULE ===
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  workOrderId String?
+  type        String
+  priority    String
+  subject     String
+  body        String
+  data        Json?
+  sentAt      DateTime @default(now())
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model NotificationPreferences {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  email     Boolean  @default(true)
+  sms       Boolean  @default(false)
+  push      Boolean  @default(true)
+  webhook   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String
+  platform  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
+
+// === WORKFLOW AUTOMATION MODULE ===
+model WorkflowRule {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  trigger     String   // work_order_created, work_order_updated, etc.
+  conditions  Json     // Rule conditions
+  actions     Json     // Actions to take
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  executions  WorkflowExecution[]
+
+  @@map("workflow_rules")
+}
+
+model WorkflowExecution {
+  id          String   @id @default(cuid())
+  ruleId      String
+  workOrderId String?
+  status      String   // pending, running, completed, failed
+  result      Json?
+  executedAt  DateTime @default(now())
+  completedAt DateTime?
+
+  // Relations
+  rule        WorkflowRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  workOrder   WorkOrder?   @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_executions")
+}
+
+// === VENDOR MANAGEMENT MODULE ===
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  address     String?
+  contactPerson String?
+  rating      Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  contracts   Contract[]
+  performance VendorPerformance[]
+
+  @@map("vendors")
+}
+
+model Contract {
+  id          String   @id @default(cuid())
+  vendorId    String
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  value       Decimal  @db.Decimal(10, 2)
+  status      String   // active, expired, terminated
+  terms       Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("contracts")
+}
+
+model VendorPerformance {
+  id          String   @id @default(cuid())
+  vendorId    String
+  workOrderId String?
+  userId      String
+  rating      Int      // 1-5
+  responseTime Int?    // in hours
+  quality     Int?     // 1-5
+  cost        Decimal? @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  vendor      Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_performance")
+}
+
+// === ENERGY MANAGEMENT MODULE ===
+model EnergyConsumption {
+  id          String   @id @default(cuid())
+  assetId     String
+  location    String
+  consumption Float
+  unit        String   // kWh, BTU, etc.
+  cost        Decimal? @db.Decimal(10, 2)
+  recordedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@map("energy_consumption")
+}
+
+model SustainabilityReport {
+  id          String   @id @default(cuid())
+  period      String   // monthly, quarterly, yearly
+  year        Int
+  month       Int?
+  quarter     Int?
+  totalEnergy Float
+  totalCost   Decimal  @db.Decimal(10, 2)
+  carbonFootprint Float?
+  reportData  Json
+  createdAt   DateTime @default(now())
+
+  @@map("sustainability_reports")
+}
+
+// === IOT SENSOR MODULE ===
+model Sensor {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // temperature, vibration, pressure, etc.
+  location    String
+  assetId     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  readings    SensorReading[]
+
+  @@map("sensors")
+}
+
+model SensorReading {
+  id        String   @id @default(cuid())
+  sensorId  String
+  value     Float
+  unit      String
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  // Relations
+  sensor    Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@map("sensor_readings")
+}
+
+// === AI PREDICTIVE MAINTENANCE MODULE ===
+model PredictionModel {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // failure_prediction, maintenance_scheduling, etc.
+  modelData   Json     // Serialized model
+  accuracy    Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  predictions Prediction[]
+
+  @@map("prediction_models")
+}
+
+model Prediction {
+  id          String   @id @default(cuid())
+  modelId     String
+  assetId     String
+  prediction  Json     // Prediction results
+  confidence  Float
+  createdAt   DateTime @default(now())
+
+  // Relations
+  model       PredictionModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("predictions")
+}
+
+// === BLOCKCHAIN COMPLIANCE MODULE ===
+model AuditTrail {
+  id          String   @id @default(cuid())
+  entityType  String   // work_order, maintenance_task, etc.
+  entityId    String
+  action      String   // created, updated, deleted, etc.
+  changes     Json
+  hash        String   // Blockchain hash
+  blockNumber String?
+  createdAt   DateTime @default(now())
+
+  @@map("audit_trails")
+}
+
+// Update existing models with new relations

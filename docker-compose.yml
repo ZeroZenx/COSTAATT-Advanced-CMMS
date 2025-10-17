@@ -1,0 +1,24 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: cmms_db
+      MYSQL_USER: cmms_user
+      MYSQL_PASSWORD: cmms_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./_data/mysql:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: cmms_user
+      PMA_PASSWORD: cmms_pass
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
