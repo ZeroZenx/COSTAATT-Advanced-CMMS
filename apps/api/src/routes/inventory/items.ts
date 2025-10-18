@@ -227,7 +227,7 @@ router.get('/transactions', async (req, res) => {
       where,
       include: {
         item: {
-          select: { id: true, displayName: true, sku: true }
+          select: { id: true, name: true, sku: true }
         },
         performedBy: {
           select: { id: true, displayName: true }

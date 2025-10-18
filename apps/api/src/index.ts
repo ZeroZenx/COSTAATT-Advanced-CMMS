@@ -25,12 +25,13 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
+// CORS configuration - More permissive for development
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
-    : ['http://localhost:5174', 'http://localhost:3000'],
-  credentials: true
+  origin: true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin'],
+  optionsSuccessStatus: 200
 }));
 
 // Logging
@@ -54,6 +55,11 @@ app.get('/health', (req, res) => {
 import authRoutes from './routes/auth';
 import analyticsRoutes from './routes/analytics';
 import notificationRoutes from './routes/notifications';
+import userRoutes from './routes/users';
+import settingsRoutes from './routes/settings';
+import workOrderRoutes from './routes/work-orders';
+import maintenanceRoutes from './routes/maintenance/schedules';
+import inventoryRoutes from './routes/inventory/items';
 import { authenticate } from './middleware/authenticate';
 
 // Import services
@@ -85,25 +91,12 @@ app.get('/api/v1', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/users', authenticate, userRoutes);
+app.use('/api/v1/settings', authenticate, settingsRoutes);
+app.use('/api/v1/work-orders', workOrderRoutes);
+app.use('/api/v1/maintenance/schedules', authenticate, maintenanceRoutes);
+app.use('/api/v1/inventory', authenticate, inventoryRoutes);
 
-// Basic work orders endpoint (protected)
-app.get('/api/v1/work-orders', authenticate, (req, res) => {
-  res.json({
-    data: [
-      {
-        id: '1',
-        title: 'Sample Work Order',
-        description: 'This is a sample work order for testing',
-        status: 'OPEN',
-        priority: 'MEDIUM',
-        location: 'Main Building - Room 101',
-        category: 'Maintenance',
-        createdAt: new Date().toISOString()
-      }
-    ],
-    total: 1
-  });
-});
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
