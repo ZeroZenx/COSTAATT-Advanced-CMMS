@@ -2,6 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { DashboardProvider } from './contexts/DashboardContext';
+// import { MicrosoftAuthProvider } from './contexts/MicrosoftAuthContext'; // Temporarily disabled
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
 import { Role } from './types/auth';
@@ -14,7 +18,11 @@ import InventoryPage from './pages/InventoryPage';
 import UsersPage from './pages/UsersPage';
 import ReportsPage from './pages/ReportsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
+import CustomizableDashboard from './components/dashboard/CustomizableDashboard';
 import TestPage from './pages/TestPage';
+import TestLogin from './pages/TestLogin';
+import SimpleTest from './pages/SimpleTest';
 import './App.css';
 
 const queryClient = new QueryClient({
@@ -29,14 +37,20 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-100">
+      <ThemeProvider>
+        <NotificationProvider>
+          <DashboardProvider>
+            {/* <MicrosoftAuthProvider> */}
+              <AuthProvider>
+          <Router>
+            <div className="min-h-screen bg-gray-100 dark:bg-dark-900">
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/unauthorized" element={<UnauthorizedPage />} />
               <Route path="/test" element={<TestPage />} />
+              <Route path="/test-login" element={<TestLogin />} />
+              <Route path="/simple-test" element={<SimpleTest />} />
               
               {/* Protected Routes */}
               <Route
@@ -85,6 +99,24 @@ function App() {
                 }
               />
               <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute allowedRoles={[Role.ADMIN]}>
+                    <Navbar />
+                    <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/custom-dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Navbar />
+                    <CustomizableDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/reports"
                 element={
                   <ProtectedRoute allowedRoles={[Role.ADMIN, Role.SUPERVISOR]}>
@@ -111,7 +143,11 @@ function App() {
             </Routes>
           </div>
         </Router>
-      </AuthProvider>
+              </AuthProvider>
+            {/* </MicrosoftAuthProvider> */}
+          </DashboardProvider>
+        </NotificationProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

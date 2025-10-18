@@ -19,6 +19,16 @@ export interface User {
 export interface LoginCredentials {
   email: string;
   password: string;
+  microsoftAuth?: boolean;
+  microsoftUser?: {
+    email: string;
+    displayName: string;
+    role: Role;
+    department?: string;
+    phone?: string;
+    isMicrosoftUser: boolean;
+    microsoftId: string;
+  };
 }
 
 export interface RegisterData {

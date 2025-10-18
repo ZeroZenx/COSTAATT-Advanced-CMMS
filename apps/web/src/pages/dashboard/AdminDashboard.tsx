@@ -1,9 +1,50 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
+
+  // Demo notifications on component mount
+  useEffect(() => {
+    // Add some demo notifications
+    setTimeout(() => {
+      addNotification({
+        type: 'info',
+        title: 'System Update',
+        message: 'CMMS system has been updated to version 2.0 with new features!',
+        persistent: true,
+        action: {
+          label: 'View Changes',
+          onClick: () => console.log('View changes clicked')
+        }
+      });
+    }, 1000);
+
+    setTimeout(() => {
+      addNotification({
+        type: 'warning',
+        title: 'Low Stock Alert',
+        message: '5 inventory items are running low on stock',
+        persistent: true,
+        action: {
+          label: 'View Inventory',
+          onClick: () => window.location.href = '/inventory'
+        }
+      });
+    }, 2000);
+
+    setTimeout(() => {
+      addNotification({
+        type: 'success',
+        title: 'Work Order Completed',
+        message: 'Work Order #WO-001 has been completed by John Smith',
+        persistent: false
+      });
+    }, 3000);
+  }, [addNotification]);
 
   return (
     <div className="min-h-screen bg-gray-100">

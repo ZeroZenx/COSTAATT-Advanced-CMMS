@@ -10,14 +10,14 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const isAuthenticated = !!user;
 
-  // Check if user is logged in on app start
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
+  // Check if user is logged in on app start - DISABLED to prevent infinite loop
+  // useEffect(() => {
+  //   checkAuthStatus();
+  // }, []);
 
   const checkAuthStatus = async () => {
     try {
@@ -33,6 +33,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (credentials: LoginCredentials) => {
     try {
+      // Handle Microsoft authentication
+      if (credentials.microsoftAuth && credentials.microsoftUser) {
+        // For Microsoft auth, we'll create a user object directly
+        // In production, you might want to sync this with your backend
+        const microsoftUser: User = {
+          id: credentials.microsoftUser.microsoftId,
+          email: credentials.microsoftUser.email,
+          displayName: credentials.microsoftUser.displayName,
+          role: credentials.microsoftUser.role,
+          department: credentials.microsoftUser.department,
+          phone: credentials.microsoftUser.phone,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        setUser(microsoftUser);
+        return;
+      }
+
+      // Regular authentication
       const userData = await authApi.login(credentials);
       setUser(userData);
     } catch (error) {

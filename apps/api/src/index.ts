@@ -60,6 +60,9 @@ import settingsRoutes from './routes/settings';
 import workOrderRoutes from './routes/work-orders';
 import maintenanceRoutes from './routes/maintenance/schedules';
 import inventoryRoutes from './routes/inventory/items';
+import emailAutomationRoutes from './routes/email-automation';
+import calendarSyncRoutes from './routes/calendar-sync';
+import complianceRoutes from './routes/compliance';
 import { authenticate } from './middleware/authenticate';
 
 // Import services
@@ -96,6 +99,9 @@ app.use('/api/v1/settings', authenticate, settingsRoutes);
 app.use('/api/v1/work-orders', workOrderRoutes);
 app.use('/api/v1/maintenance/schedules', authenticate, maintenanceRoutes);
 app.use('/api/v1/inventory', authenticate, inventoryRoutes);
+app.use('/api/v1/email-automation', authenticate, emailAutomationRoutes);
+app.use('/api/v1/calendar-sync', authenticate, calendarSyncRoutes);
+app.use('/api/v1/compliance', authenticate, complianceRoutes);
 
 
 // Error handling middleware
