@@ -13,6 +13,8 @@ import LoginPage from './pages/auth/LoginPage';
 import UnauthorizedPage from './pages/auth/UnauthorizedPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
+import CampusServicesPage from './pages/CampusServicesPage';
+import ContractorsPage from './pages/ContractorsPage';
 import MaintenancePage from './pages/MaintenancePage';
 import InventoryPage from './pages/InventoryPage';
 import UsersPage from './pages/UsersPage';
@@ -68,6 +70,24 @@ function App() {
                   <ProtectedRoute>
                     <Navbar />
                     <WorkOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/campus-services"
+                element={
+                  <ProtectedRoute>
+                    <Navbar />
+                    <CampusServicesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/contractors"
+                element={
+                  <ProtectedRoute allowedRoles={[Role.ADMIN, Role.SUPERVISOR]}>
+                    <Navbar />
+                    <ContractorsPage />
                   </ProtectedRoute>
                 }
               />

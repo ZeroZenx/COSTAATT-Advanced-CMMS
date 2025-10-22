@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Role } from '../types/auth';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:4000/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
 
 interface User {
   id: string;

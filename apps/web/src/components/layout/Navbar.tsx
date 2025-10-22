@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth, isAdmin, isSupervisor, isTechnician } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import NotificationCenter from '../NotificationCenter';
-import GlobalSearch from '../GlobalSearch';
 import { Role } from '../../types/auth';
 
 export default function Navbar() {
@@ -51,10 +50,6 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Global Search */}
-          <div className="hidden md:flex flex-1 max-w-sm mx-4">
-            <GlobalSearch />
-          </div>
 
           {/* Navigation Links */}
           <div className="hidden lg:flex items-center space-x-4">
@@ -78,6 +73,28 @@ export default function Navbar() {
             >
               Orders
             </Link>
+            <Link 
+              to="/campus-services" 
+              className={`px-2 py-1 rounded-md text-sm font-medium ${
+                location.pathname === '/campus-services' 
+                  ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' 
+                  : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              Campus Services
+            </Link>
+            {(isAdmin(user) || isSupervisor(user)) && (
+              <Link 
+                to="/contractors" 
+                className={`px-2 py-1 rounded-md text-sm font-medium ${
+                  location.pathname === '/contractors' 
+                    ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' 
+                    : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                }`}
+              >
+                Contractors
+              </Link>
+            )}
             {isSupervisor(user) && (
               <Link 
                 to="/maintenance" 
@@ -242,6 +259,30 @@ export default function Navbar() {
               >
                 Work Orders
               </Link>
+              <Link 
+                to="/campus-services" 
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  location.pathname === '/campus-services' 
+                    ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' 
+                    : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Campus Services
+              </Link>
+              {(isAdmin(user) || isSupervisor(user)) && (
+                <Link 
+                  to="/contractors" 
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${
+                    location.pathname === '/contractors' 
+                      ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' 
+                      : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                  }`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Manage Contractors
+                </Link>
+              )}
               {isSupervisor(user) && (
                 <Link 
                   to="/maintenance" 

@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
 import { Role } from '@prisma/client';
 import { z } from 'zod';
+import { emailService } from '../services/EmailService';
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ const createWorkOrderSchema = z.object({
   assignedToId: z.string().optional(),
   dueDate: z.string().datetime().optional(),
   estimatedHours: z.number().min(0).optional(),
+  estimatedDuration: z.number().min(0).optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -151,7 +153,7 @@ router.get('/', authenticate, async (req, res) => {
             select: {
               id: true,
               filename: true,
-              fileSize: true,
+              size: true,
               mimeType: true,
               createdAt: true,
             },
@@ -250,12 +252,51 @@ router.post('/', authenticate, async (req, res) => {
     const workOrderCount = await prisma.workOrder.count();
     const workOrderNumber = `WO-${String(workOrderCount + 1).padStart(4, '0')}`;
 
+    const { estimatedHours, ...dataWithoutEstimatedHours } = validatedData;
     const workOrder = await prisma.workOrder.create({
       data: {
-        ...validatedData,
+        ...dataWithoutEstimatedHours,
+        estimatedDuration: estimatedHours || validatedData.estimatedDuration,
         workOrderNumber,
-        createdById: user.id,
+        createdById: user.userId,
         status: 'OPEN',
+        // Initialize Campus Services Work Process
+        workflowPhases: {
+          create: [
+            {
+              phase: 'ORIGINATION',
+              status: 'COMPLETED',
+              startedAt: new Date(),
+              completedAt: new Date(),
+              notes: 'Work order created and entered into CMMS system',
+            },
+            {
+              phase: 'PLANNING',
+              status: 'PENDING',
+              notes: 'Awaiting planning and resource validation',
+            },
+            {
+              phase: 'SCHEDULING',
+              status: 'PENDING',
+              notes: 'Awaiting resource assignment and authorization',
+            },
+            {
+              phase: 'EXECUTION',
+              status: 'PENDING',
+              notes: 'Awaiting work performance',
+            },
+            {
+              phase: 'FEEDBACK',
+              status: 'PENDING',
+              notes: 'Awaiting quality verification',
+            },
+            {
+              phase: 'EVALUATION',
+              status: 'PENDING',
+              notes: 'Awaiting performance evaluation',
+            },
+          ],
+        },
       },
       include: {
         createdBy: {
@@ -274,8 +315,29 @@ router.post('/', authenticate, async (req, res) => {
             role: true,
           },
         },
+        workflowPhases: {
+          orderBy: {
+            phase: 'asc',
+          },
+        },
       },
     });
+
+    // Send email notification for new work order
+    try {
+      const recipients = ['CSD@costaatt.edu.tt'];
+      if (workOrder.assignedTo?.email) {
+        recipients.push(workOrder.assignedTo.email);
+      }
+      if (workOrder.createdBy?.email) {
+        recipients.push(workOrder.createdBy.email);
+      }
+      
+      await emailService.sendWorkOrderCreatedEmail(workOrder, recipients);
+    } catch (emailError) {
+      console.error('Failed to send work order creation email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(201).json({ data: workOrder });
   } catch (error) {
@@ -337,6 +399,40 @@ router.patch('/:id', authenticate, async (req, res) => {
         },
       },
     });
+
+    // Send email notification for work order update
+    try {
+      const recipients = ['CSD@costaatt.edu.tt'];
+      if (workOrder.assignedTo?.email) {
+        recipients.push(workOrder.assignedTo.email);
+      }
+      if (workOrder.createdBy?.email) {
+        recipients.push(workOrder.createdBy.email);
+      }
+      
+      const changes = [];
+      if (validatedData.status && validatedData.status !== existingWorkOrder.status) {
+        changes.push(`Status changed from ${existingWorkOrder.status} to ${validatedData.status}`);
+      }
+      if (validatedData.priority && validatedData.priority !== existingWorkOrder.priority) {
+        changes.push(`Priority changed from ${existingWorkOrder.priority} to ${validatedData.priority}`);
+      }
+      if (validatedData.assignedToId && validatedData.assignedToId !== existingWorkOrder.assignedToId) {
+        changes.push('Assignment changed');
+      }
+      
+      if (changes.length > 0) {
+        await emailService.sendWorkOrderUpdatedEmail(workOrder, recipients, changes);
+      }
+      
+      // Send completion email if status changed to COMPLETED
+      if (validatedData.status === 'COMPLETED') {
+        await emailService.sendWorkOrderCompletedEmail(workOrder, recipients);
+      }
+    } catch (emailError) {
+      console.error('Failed to send work order update email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.json({ data: workOrder });
   } catch (error) {

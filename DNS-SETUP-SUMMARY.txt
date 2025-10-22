@@ -1,0 +1,39 @@
+================================================================================
+CMMS DNS SETUP - QUICK REFERENCE
+================================================================================
+
+CURRENT STATUS:
+✅ CMMS is working at: http://10.2.1.27:5174
+✅ Apache reverse proxy is configured
+⏳ DNS record needed for friendly URL
+
+DNS RECORD TO CREATE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Type:        A (Address Record)
+Name:        cmms
+Domain:      costaatt.edu.tt
+Full Name:   cmms.costaatt.edu.tt
+IP Address:  10.2.1.27
+TTL:         3600 (or default)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AFTER DNS IS SET UP:
+Users can access CMMS at: http://cmms.costaatt.edu.tt
+(No port number needed!)
+
+CONTACT:
+Your Network Administrator or DNS Manager
+
+TEST BEFORE DNS (Optional):
+Add to C:\Windows\System32\drivers\etc\hosts:
+10.2.1.27  cmms.costaatt.edu.tt
+
+VERIFY DNS WORKS:
+nslookup cmms.costaatt.edu.tt
+Should return: 10.2.1.27
+
+For full details: C:\COSTAATT-CMMS\DNS-SETUP-GUIDE.md
+
+================================================================================
+
+

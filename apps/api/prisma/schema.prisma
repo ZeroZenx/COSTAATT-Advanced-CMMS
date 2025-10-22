@@ -45,6 +45,82 @@ enum TransactionType {
   ADJUST
 }
 
+enum WorkType {
+  INTERNAL
+  CONTRACTOR
+  MIXED
+}
+
+enum OriginationSource {
+  CUSTOMER_REQUEST
+  INSPECTION_ROUNDS
+  PREVENTIVE_MAINTENANCE
+  EMERGENCY
+}
+
+enum WorkflowPhaseType {
+  ORIGINATION
+  PLANNING
+  SCHEDULING
+  EXECUTION
+  FEEDBACK
+  EVALUATION
+}
+
+enum PhaseStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum AssignmentType {
+  PRIMARY
+  BACKUP
+  SPECIALIST
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COMPLETED
+}
+
+enum POStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum ExecutionStatus {
+  STARTED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+}
+
+enum DocumentType {
+  ESTIMATE
+  QUOTATION
+  INVOICE
+  DELIVERY_NOTE
+  CERTIFICATE
+  REPORT
+  OTHER
+}
+
+enum ReportType {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
 enum MaintenanceStatus {
   ACTIVE
   INACTIVE
@@ -81,6 +157,13 @@ model User {
   // Vendor performance relations
   vendorPerformance   VendorPerformance[]
 
+  // Campus Services Work Process relations
+  workExecutedBy      WorkExecutionLog[] @relation("WorkExecutedBy")
+  qualityCheckedBy    WorkQualityCheck[] @relation("QualityCheckedBy")
+  documentUploadedBy  WorkflowDocument[] @relation("DocumentUploadedBy")
+  reportGeneratedBy   PerformanceReport[] @relation("ReportGeneratedBy")
+  poApprovedBy       PurchaseOrder[] @relation("POApprovedBy")
+
   @@map("users")
 }
 
@@ -98,6 +181,15 @@ model WorkOrder {
   updatedAt   DateTime @updatedAt
   dueDate     DateTime?
   completedAt DateTime?
+
+  // Campus Services Work Process fields
+  workType            WorkType?   @default(INTERNAL)
+  originationSource   OriginationSource? @default(CUSTOMER_REQUEST)
+  canPerformInternally Boolean?   @default(true)
+  requiresContractor  Boolean?   @default(false)
+  estimatedCost       Decimal?   @db.Decimal(10, 2)
+  estimatedDuration   Int?       // in hours
+  workOrderNumber     String?    @unique
 
   // Relations
   createdBy   User        @relation("CreatedBy", fields: [createdById], references: [id])
@@ -118,6 +210,15 @@ model WorkOrder {
   
   // Vendor performance relations
   vendorPerformance VendorPerformance[]
+
+  // Campus Services Work Process relations
+  workflowPhases         WorkflowPhase[]
+  contractorAssignments  ContractorAssignment[]
+  purchaseOrders         PurchaseOrder[]
+  workExecutionLogs      WorkExecutionLog[]
+  workQualityChecks      WorkQualityCheck[]
+  performanceMetrics      PerformanceMetric[]
+  workflowDocuments      WorkflowDocument[]
 
   @@map("work_orders")
 }
@@ -372,6 +473,8 @@ model Vendor {
   // Relations
   contracts   Contract[]
   performance VendorPerformance[]
+  assignments ContractorAssignment[]
+  purchaseOrders PurchaseOrder[]
 
   @@map("vendors")
 }
@@ -413,6 +516,181 @@ model VendorPerformance {
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("vendor_performance")
+}
+
+// === CAMPUS SERVICES WORK PROCESS MODULE ===
+model WorkflowPhase {
+  id          String   @id @default(cuid())
+  workOrderId String
+  phase       WorkflowPhaseType
+  status      PhaseStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([workOrderId, phase])
+  @@map("workflow_phases")
+}
+
+model ContractorAssignment {
+  id                    String           @id @default(cuid())
+  workOrderId           String
+  vendorId              String
+  assignmentType        AssignmentType   @default(PRIMARY)
+  estimatedCost         Decimal?         @db.Decimal(10, 2)
+  estimatedDurationHours Int?
+  assignedAt            DateTime         @default(now())
+  status                AssignmentStatus @default(PENDING)
+  notes                 String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  // Relations
+  workOrder             WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  vendor                Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("contractor_assignments")
+}
+
+model PurchaseOrder {
+  id          String   @id @default(cuid())
+  workOrderId String
+  vendorId    String
+  poNumber    String   @unique
+  status      POStatus @default(DRAFT)
+  totalAmount Decimal  @db.Decimal(10, 2)
+  currency    String   @default("TTD")
+  issuedDate  DateTime?
+  dueDate     DateTime?
+  approvedBy  String?
+  approvedAt  DateTime?
+  terms       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  approvedByUser User?  @relation("POApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  items       PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  itemName        String
+  description     String?
+  quantity        Int
+  unitPrice       Decimal  @db.Decimal(10, 2)
+  totalPrice      Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}
+
+model WorkExecutionLog {
+  id                String          @id @default(cuid())
+  workOrderId       String
+  executedById      String
+  executionType     String          // INTERNAL or CONTRACTOR
+  startTime         DateTime?
+  endTime           DateTime?
+  hoursWorked       Decimal?        @db.Decimal(5, 2)
+  materialsUsed     String?
+  issuesEncountered String?
+  progressNotes     String?
+  status            ExecutionStatus @default(STARTED)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  workOrder         WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  executedBy        User            @relation("WorkExecutedBy", fields: [executedById], references: [id], onDelete: Cascade)
+
+  @@map("work_execution_logs")
+}
+
+model WorkQualityCheck {
+  id                      String   @id @default(cuid())
+  workOrderId             String
+  checkedById             String
+  qualityRating           Int      // 1-5
+  timePerformanceRating   Int      // 1-5
+  costPerformanceRating   Int      // 1-5
+  complianceCheck         Boolean  @default(false)
+  safetyCheck             Boolean  @default(false)
+  customerSatisfaction    Int      // 1-5
+  issuesFound             String?
+  correctiveActions       String?
+  approvedForClosure      Boolean  @default(false)
+  checkedAt               DateTime @default(now())
+
+  // Relations
+  workOrder               WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  checkedBy               User      @relation("QualityCheckedBy", fields: [checkedById], references: [id], onDelete: Cascade)
+
+  @@map("work_quality_checks")
+}
+
+model PerformanceMetric {
+  id            String   @id @default(cuid())
+  workOrderId   String
+  metricType    String   // TURNAROUND_TIME, COST_EFFICIENCY, QUALITY_SCORE, etc.
+  metricValue   Decimal  @db.Decimal(10, 2)
+  targetValue   Decimal? @db.Decimal(10, 2)
+  unit          String?
+  calculatedAt  DateTime @default(now())
+
+  // Relations
+  workOrder     WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@map("performance_metrics")
+}
+
+model WorkflowDocument {
+  id            String       @id @default(cuid())
+  workOrderId   String
+  phase         WorkflowPhaseType
+  documentType  DocumentType
+  filename      String
+  originalName  String
+  filePath      String
+  fileSize      Int
+  mimeType      String?
+  uploadedBy    String
+  uploadedAt    DateTime     @default(now())
+
+  // Relations
+  workOrder     WorkOrder    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  uploadedByUser User        @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@map("workflow_documents")
+}
+
+model PerformanceReport {
+  id            String     @id @default(cuid())
+  reportType    ReportType
+  periodStart   DateTime
+  periodEnd     DateTime
+  generatedBy   String
+  reportData    Json?
+  filePath      String?
+  generatedAt   DateTime   @default(now())
+
+  // Relations
+  generatedByUser User     @relation("ReportGeneratedBy", fields: [generatedBy], references: [id], onDelete: Cascade)
+
+  @@map("performance_reports")
 }
 
 // === ENERGY MANAGEMENT MODULE ===
